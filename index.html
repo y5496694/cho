@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>학생선수 훈련일지 생성기</title>
+    <title>학생선수 훈련/상담일지 생성기</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -185,14 +185,35 @@
             font-size: 2rem;
             font-weight: bold;
         }
+        
+        /* --- START: 상담일지 레이아웃 수정 --- */
+        .counseling-page .approval-box {
+            position: static; /* absolute 속성 제거 */
+        }
+        .counseling-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end; /* 제목과 결재란을 아래 기준으로 정렬 */
+            margin-bottom: 1.5rem;
+        }
+        .counseling-header .log-title {
+            flex-grow: 1; /* 제목이 남은 공간을 모두 차지하도록 설정 */
+            margin-bottom: 0;
+        }
+        .counseling-header .approval-box-wrapper {
+            flex-shrink: 0; /* 결재란이 줄어들지 않도록 설정 */
+            margin-left: 1rem;
+        }
+        /* --- END: 상담일지 레이아웃 수정 --- */
+
     </style>
 </head>
 <body class="bg-gray-50 text-gray-800">
 
     <div class="container mx-auto p-4 sm:p-6 lg:p-8">
         <header class="text-center mb-8">
-            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">학생선수 훈련일지 생성기</h1>
-            <p class="mt-2 text-md text-gray-600">필수 정보를 입력하고 간편하게 훈련 일지를 만들어보세요.</p>
+            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">학생선수 훈련/상담일지 생성기</h1>
+            <p class="mt-2 text-md text-gray-600">필수 정보를 입력하고 간편하게 훈련 및 상담 일지를 만들어보세요.</p>
         </header>
 
         <main class="bg-white p-6 sm:p-8 rounded-2xl shadow-lg">
@@ -256,6 +277,40 @@
                             <div id="calendar-grid" class="grid grid-cols-8 gap-1 text-center"></div>
                         </div>
                     </div>
+
+                    <!-- 상담일지 생성 여부 -->
+                    <div class="md:col-span-2 p-4 border rounded-lg bg-gray-50">
+                        <div class="flex items-center">
+                            <input id="generate-counseling-checkbox" type="checkbox" class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                            <label for="generate-counseling-checkbox" class="ml-2 block text-lg font-semibold text-gray-800">상담일지 생성 여부</label>
+                        </div>
+                    </div>
+
+                    <!-- 상담일지 입력 섹션 (초기에는 숨김) -->
+                    <div id="counseling-input-section" class="md:col-span-2 p-4 border rounded-lg bg-gray-50 hidden">
+                        <h3 class="font-semibold text-lg text-gray-700 mb-2">상담 내용 입력</h3>
+                        <p class="text-sm text-gray-500 mb-4">상담내용에 키워드/주제만 작성하고 '문장 생성'을 누르면 AI가 자연스러운 문장으로 만들어줍니다.</p>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm text-left">
+                                <thead class="text-xs text-gray-700 uppercase bg-gray-100">
+                                    <tr>
+                                        <th class="px-2 py-2">순번</th>
+                                        <th class="px-2 py-2">상담일자 (MM/DD)</th>
+                                        <th class="px-2 py-2">학년</th>
+                                        <th class="px-2 py-2">이름</th>
+                                        <th class="px-2 py-2 w-2/5">상담내용 (키워드/주제)</th>
+                                        <th class="px-2 py-2">상담자</th>
+                                        <th class="px-2 py-2"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="counseling-input-tbody">
+                                    <!-- 행이 동적으로 추가됩니다 -->
+                                </tbody>
+                            </table>
+                        </div>
+                        <button id="add-counseling-row-btn" class="mt-4 bg-gray-200 text-gray-800 font-bold py-2 px-4 rounded-lg hover:bg-gray-300">+ 추가</button>
+                    </div>
+
                 </div>
 
                 <div class="mt-8 text-center">
@@ -408,7 +463,7 @@
         
         document.getElementById('generate-btn').addEventListener('click', generateLog);
 
-        function generateLog() {
+        async function generateLog() {
             const teacherName = document.getElementById('teacherName').value;
             const schoolName = document.getElementById('schoolName').value;
             const clubName = document.getElementById('clubName').value;
@@ -432,12 +487,23 @@
             document.getElementById('log-output').classList.add('hidden');
             document.getElementById('loader-container').classList.remove('hidden');
 
-            const coverPageHtml = generateCoverPageHtml(new Date().getFullYear(), clubName, teacherName, schoolName);
-            const trainingLogHtml = generateTrainingLogHtml(sortedDates, members, macros, trainingTime, clubName);
-            
-            document.getElementById('generated-log-content').innerHTML = coverPageHtml + trainingLogHtml;
-            document.getElementById('loader-container').classList.add('hidden');
-            document.getElementById('log-output').classList.remove('hidden');
+            try {
+                const coverPageHtml = generateCoverPageHtml(new Date().getFullYear(), clubName, teacherName, schoolName);
+                const trainingLogHtml = generateTrainingLogHtml(sortedDates, members, macros, trainingTime, clubName);
+                let counselingLogHtml = '';
+
+                if (document.getElementById('generate-counseling-checkbox').checked) {
+                    counselingLogHtml = await generateCounselingLogHtml();
+                }
+                
+                document.getElementById('generated-log-content').innerHTML = coverPageHtml + trainingLogHtml + counselingLogHtml;
+            } catch (error) {
+                 console.error('Error generating log:', error);
+                showMessage('일지 생성 중 오류가 발생했습니다: ' + error.message);
+            } finally {
+                document.getElementById('loader-container').classList.add('hidden');
+                document.getElementById('log-output').classList.remove('hidden');
+            }
         }
         
         function getWeekNumber(d) {
@@ -453,7 +519,7 @@
                     <div class="cover-content">
                         <p class="year">${year}학년도</p>
                         <div class="title-box">
-                            <h1>학생 선수 훈련 일지</h1>
+                            <h1>학생 선수 훈련/상담 일지</h1>
                         </div>
                         <div class="details">
                             <p>종목: ${clubName}</p>
@@ -528,6 +594,149 @@
             return html;
         }
         
+        // --- 상담일지 관련 함수들 ---
+        document.getElementById('generate-counseling-checkbox').addEventListener('change', (e) => {
+            const section = document.getElementById('counseling-input-section');
+            if (e.target.checked) {
+                section.classList.remove('hidden');
+                if (document.getElementById('counseling-input-tbody').children.length === 0) {
+                    addCounselingRow();
+                }
+            } else {
+                section.classList.add('hidden');
+            }
+        });
+
+        document.getElementById('add-counseling-row-btn').addEventListener('click', addCounselingRow);
+        
+        let counselingRowCount = 0;
+        function addCounselingRow() {
+            counselingRowCount++;
+            const tbody = document.getElementById('counseling-input-tbody');
+            const newRow = document.createElement('tr');
+            newRow.className = 'bg-white border-b';
+            newRow.innerHTML = `
+                <td class="px-2 py-2 font-medium text-gray-900">${counselingRowCount}</td>
+                <td class="px-2 py-2"><input type="text" class="counseling-date w-full border rounded p-1" placeholder="MM/DD"></td>
+                <td class="px-2 py-2"><input type="text" class="counseling-grade w-12 border rounded p-1" placeholder="6"></td>
+                <td class="px-2 py-2"><input type="text" class="counseling-name w-full border rounded p-1"></td>
+                <td class="px-2 py-2"><textarea class="counseling-content w-full border rounded p-1" rows="2" placeholder="키워드 입력 후 문장 생성"></textarea></td>
+                <td class="px-2 py-2"><input type="text" class="counseling-counselor w-full border rounded p-1" placeholder="담당교사"></td>
+                <td class="px-2 py-2"><button type="button" class="generate-sentence-btn bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded hover:bg-blue-200">문장 생성</button></td>
+            `;
+            tbody.appendChild(newRow);
+        }
+
+        document.getElementById('counseling-input-tbody').addEventListener('click', async (e) => {
+            if (e.target && e.target.classList.contains('generate-sentence-btn')) {
+                const btn = e.target;
+                const row = btn.closest('tr');
+                const contentTextarea = row.querySelector('.counseling-content');
+                const studentNameInput = row.querySelector('.counseling-name');
+                const keyword = contentTextarea.value;
+                const studentName = studentNameInput.value || '해당 학생은';
+
+                if (!keyword) {
+                    showMessage('상담내용 키워드를 먼저 입력해주세요.');
+                    return;
+                }
+
+                btn.textContent = '생성중...';
+                btn.disabled = true;
+
+                try {
+                    const clubName = document.getElementById('clubName').value;
+                    const prompt = `당신은 초등학교 교사입니다. 다음 정보를 바탕으로 학생선수 상담일지에 들어갈 한 문단 분량의 구체적인 상담 내용을 작성해주세요. 문장의 끝은 반드시 '함.', '임.', '하였음.'과 같이 'ㅁ' 받침으로 끝나야 합니다. 전체 내용을 한 개의 자연스러운 문단으로 요약하여 작성해야 합니다.
+                    
+[정보]
+- 학생 이름: ${studentName}
+- 부서명: ${clubName}
+- 상담 키워드: "${keyword}"
+
+[작성 예시]
+키워드: "체력 저하 고민"
+생성 예시: "최근 체력 훈련 시 힘들어하는 모습을 자주 보임. 특히 후반부에 집중력이 떨어지고 동작이 무뎌지는 경향이 있어, 체력적인 부담에 대해 이야기를 나눔. 꾸준한 기초 체력 훈련의 중요성을 강조하고, 무리하지 않는 선에서 점진적으로 훈련 강도를 높여갈 수 있도록 격려함."
+
+[요청]
+위 정보를 바탕으로 상담 내용을 생성해주세요.`;
+                    
+                    let chatHistory = [{ role: "user", parts: [{ text: prompt }] }];
+                    const payload = { contents: chatHistory };
+                    const apiKey = "AIzaSyC7_Gq4LIVVMv0hMD6qSwcTlGJcDSt-KgI";
+                    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) throw new Error(`API call failed: ${response.statusText}`);
+                    
+                    const result = await response.json();
+                    const generatedText = result.candidates[0].content.parts[0].text;
+                    contentTextarea.value = generatedText;
+
+                } catch (error) {
+                    console.error("Sentence generation error:", error);
+                    showMessage("문장 생성에 실패했습니다.");
+                } finally {
+                    btn.textContent = '문장 생성';
+                    btn.disabled = false;
+                }
+            }
+        });
+
+        async function generateCounselingLogHtml() {
+            const rows = document.querySelectorAll('#counseling-input-tbody tr');
+            if (rows.length === 0) return '';
+            
+            const data = [];
+            let isValid = true;
+            rows.forEach(row => {
+                const date = row.querySelector('.counseling-date').value;
+                const name = row.querySelector('.counseling-name').value;
+                const content = row.querySelector('.counseling-content').value;
+
+                if (!date || !name || !content) {
+                    isValid = false;
+                    return;
+                }
+                data.push({
+                    date: date,
+                    grade: row.querySelector('.counseling-grade').value || '6',
+                    name: name,
+                    content: content,
+                    counselor: row.querySelector('.counseling-counselor').value || '담당교사(담임)'
+                });
+            });
+
+            if (!isValid) {
+                showMessage('상담일지의 모든 행에 상담일자, 이름, 상담내용을 입력해주세요.');
+                throw new Error('Incomplete counseling log data.');
+            }
+            if (data.length === 0) return '';
+
+            // --- START: 상담일지 HTML 구조 수정 ---
+            let html = `<div class="page-container counseling-page">`;
+            const clubName = document.getElementById('clubName').value;
+            html += `
+                <div class="counseling-header">
+                    <h2 class="log-title">${new Date().getFullYear()}년 ${clubName} 학생선수 상담 일지</h2>
+                    <div class="approval-box-wrapper">
+                        ${getApprovalBoxHtml()}
+                    </div>
+                </div>
+            `;
+            // --- END: 상담일지 HTML 구조 수정 ---
+            html += `<table><thead><tr><th>순번</th><th>상담일자</th><th>학년/반</th><th>이름</th><th>상담내용</th><th>상담자</th></tr></thead><tbody>`;
+            data.forEach((item, index) => {
+                html += `<tr><td>${index + 1}</td><td>${item.date}</td><td>${item.grade}</td><td>${item.name}</td><td class="content">${item.content}</td><td>${item.counselor}</td></tr>`;
+            });
+            html += '</tbody></table></div>';
+            return html;
+        }
+
         function showMessage(message) {
             const messageBox = document.getElementById('message-box');
             messageBox.textContent = message;
@@ -567,7 +776,7 @@
                     doc.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
                 }
                 
-                doc.save('학생선수_훈련일지.pdf');
+                doc.save('학생선수_훈련상담일지.pdf');
                 showMessage('PDF 파일이 성공적으로 다운로드되었습니다.');
             } catch (error) {
                 console.error("PDF 생성 오류:", error);

@@ -52,7 +52,7 @@
         @media print {
             @page {
                 size: A4;
-                margin: 1.5cm; /* 인쇄 여백 설정, 브라우저 헤더/푸터 제거 */
+                margin: 1.5cm;
             }
             body, html {
                 background-color: white;
@@ -537,7 +537,7 @@
             const members = parseMembers(members_text);
             const sortedDates = Array.from(selectedDates).sort();
 
-            const coverPageHtml = generateCoverPageHtml(new Date().getFullYear(), clubName, teacherName, schoolName, "학생 선수 훈련 일지");
+            const coverPageHtml = generateCoverPageHtml(new Date().getFullYear(), clubName, teacherName, schoolName, "학생 선수 훈련/상담 일지");
             const trainingLogHtml = generateTrainingLogHtml(sortedDates, members, macros, trainingTime, clubName, useAiTraining, allActivities);
             
             document.getElementById('generated-log-content').innerHTML = coverPageHtml + trainingLogHtml;
@@ -551,9 +551,8 @@
                  showMessage('상담일지 생성을 위해 기본 정보(담당교사, 학교, 부서)를 입력해주세요.');
                  throw new Error('Incomplete basic info for counseling log.');
             }
-            const coverPageHtml = generateCoverPageHtml(new Date().getFullYear(), clubName, teacherName, schoolName, "학생 선수 상담 일지");
-            const counselingLogHtml = await generateCounselingLogHtml();
-            document.getElementById('generated-log-content').innerHTML = coverPageHtml + counselingLogHtml;
+            const counselingLogHtml = await buildCounselingPagesHtml();
+            document.getElementById('generated-log-content').innerHTML = counselingLogHtml;
         }
         
         function getWeekNumber(d) {
@@ -747,7 +746,7 @@
             }
         });
 
-        async function generateCounselingLogHtml() {
+        async function buildCounselingPagesHtml() {
             const rows = document.querySelectorAll('#counseling-input-tbody tr');
             if (rows.length === 0) return '';
             
@@ -770,16 +769,19 @@
                 throw new Error('No counseling log data to generate.');
             }
 
-            // --- START: 상담일지 페이지 분할 로직 수정 ---
             let html = '';
-            const ROWS_PER_PAGE = 15; // 페이지당 행 수 조절
+            const ROWS_PER_PAGE = 5;
             const numPages = Math.ceil(data.length / ROWS_PER_PAGE);
+            const clubName = document.getElementById('clubName').value;
+            const teacherName = document.getElementById('teacherName').value;
+            const schoolName = document.getElementById('schoolName').value;
+            
+            html += generateCoverPageHtml(new Date().getFullYear(), clubName, teacherName, schoolName, "학생 선수 상담 일지");
 
             for (let i = 0; i < numPages; i++) {
                 const pageData = data.slice(i * ROWS_PER_PAGE, (i + 1) * ROWS_PER_PAGE);
                 
                 html += `<div class="page-container counseling-page">`;
-                const clubName = document.getElementById('clubName').value;
                 html += `
                     <div class="counseling-header">
                         <h2 class="log-title">${new Date().getFullYear()}년 ${clubName} 학생선수 상담 일지</h2>
@@ -794,7 +796,6 @@
                 });
                 html += '</tbody></table></div>';
             }
-            // --- END: 상담일지 페이지 분할 로직 수정 ---
             return html;
         }
 
@@ -837,7 +838,7 @@
                     doc.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
                 }
                 
-                doc.save('학생선수_훈련상담일지.pdf');
+                doc.save('학생선수_일지.pdf');
                 showMessage('PDF 파일이 성공적으로 다운로드되었습니다.');
             } catch (error) {
                 console.error("PDF 생성 오류:", error);
